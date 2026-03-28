@@ -45,3 +45,38 @@ cd "/Users/LA/Documents/3 курс/ПКС/WhatsAppBot"
 - `update <index> <новый_текст>`
 - `delete <index>`
 - `list`
+
+## Полезные команды для БД
+
+Подключение к локальной БД:
+
+```bash
+psql -h /tmp -p 5432 -U wbot_user -d whatsapp_bot
+```
+
+Назначить пользователя администратором:
+
+```sql
+UPDATE users
+SET role = 'Admin', question_count = 0
+WHERE username = 'Leonid Aleksandrov';
+```
+
+Полная очистка стенда:
+
+```sql
+TRUNCATE TABLE messages, logs RESTART IDENTITY;
+DELETE FROM users WHERE username NOT IN ('admin','user1','guest');
+UPDATE users SET role='Admin', question_count=0 WHERE username='admin';
+UPDATE users SET role='User', question_count=0 WHERE username='user1';
+UPDATE users SET role='Guest', question_count=0 WHERE username='guest';
+```
+
+## Частые проблемы
+
+- `session not created` с ChromeDriver:
+  версия Chrome и драйвера не совпала; в проекте включен авто-подбор драйвера.
+- `TimeoutException` после QR:
+  увеличьте `WA_AUTH_TIMEOUT_SEC` в `.env` (например, до `600`).
+- `ChromeDriver only supports characters in the BMP`:
+  это из-за некоторых emoji; в проекте включена автоматическая фильтрация перед отправкой.

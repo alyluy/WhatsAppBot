@@ -6,6 +6,8 @@ __pycache__/
 *.log
 *.tmp
 *.swp
+bootstrap.log
+.env.local
 .python-version
 .coverage
 .pytest_cache/
