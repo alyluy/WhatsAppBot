@@ -18,6 +18,7 @@ _tunnel: Optional[SSHTunnelForwarder] = None
 
 
 def _env_bool(name: str, default: bool = False) -> bool:
+    """Читает boolean-переменную окружения с дефолтным значением."""
     value = os.getenv(name)
     if value is None:
         return default
@@ -25,6 +26,7 @@ def _env_bool(name: str, default: bool = False) -> bool:
 
 
 def is_enabled() -> bool:
+    """Проверяет, включен ли SSH-туннель в конфигурации."""
     return _env_bool("SSH_ENABLED", False)
 
 

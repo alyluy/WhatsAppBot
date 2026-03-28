@@ -15,6 +15,7 @@ load_dotenv()
 
 
 def _console_mode(username: str):
+    """Запускает режим обработки команд через консоль."""
     print("Система запущена (console mode). Введите команды:")
     print("create <текст>, read, update <index> <текст>, delete <index>, list")
     print("exit — для выхода")
@@ -31,6 +32,7 @@ def _console_mode(username: str):
 
 
 def _whatsapp_mode(username: str):
+    """Запускает режим обработки команд через WhatsApp Web."""
     chat_name = os.getenv("WA_DEFAULT_CHAT", "").strip()
     if not chat_name:
         raise RuntimeError("Для WhatsApp режима укажите WA_DEFAULT_CHAT в .env")
@@ -107,6 +109,7 @@ def _whatsapp_mode(username: str):
 
 
 def main():
+    """Точка входа: выбирает режим запуска и инициализирует БД."""
     username = os.getenv("APP_USER", "user1")
     app_mode = os.getenv("APP_MODE", "console").strip().lower()
 

@@ -20,11 +20,13 @@ def initialize() -> None:
 
 
 def _ensure_initialized() -> None:
+    """Гарантирует, что схема БД инициализирована перед операцией."""
     if not _initialized:
         initialize()
 
 
 def add_log(message: str) -> None:
+    """Добавляет запись в таблицу логов."""
     _ensure_initialized()
     connection = db_connection.get_connection()
     try:
@@ -43,6 +45,7 @@ def add_log(message: str) -> None:
 
 
 def get_logs(limit: int = 200) -> List[str]:
+    """Возвращает последние записи лога в хронологическом порядке."""
     _ensure_initialized()
     connection = db_connection.get_connection()
     try:
@@ -64,6 +67,7 @@ def get_logs(limit: int = 200) -> List[str]:
 
 
 def get_user(username: str) -> Optional[Dict[str, object]]:
+    """Возвращает данные пользователя по его имени."""
     _ensure_initialized()
     connection = db_connection.get_connection()
     try:
@@ -91,6 +95,7 @@ def get_user(username: str) -> Optional[Dict[str, object]]:
 
 
 def ensure_user(username: str, default_role: str = "Guest") -> None:
+    """Создает пользователя, если его еще нет в таблице."""
     _ensure_initialized()
     connection = db_connection.get_connection()
     try:
@@ -112,6 +117,7 @@ def ensure_user(username: str, default_role: str = "Guest") -> None:
 
 
 def update_user_role(username: str, new_role: str) -> None:
+    """Обновляет роль пользователя и пишет событие в лог."""
     _ensure_initialized()
     connection = db_connection.get_connection()
     try:
@@ -134,6 +140,7 @@ def update_user_role(username: str, new_role: str) -> None:
 
 
 def increment_question_count(username: str) -> int:
+    """Увеличивает счетчик вопросов пользователя и возвращает новое значение."""
     _ensure_initialized()
     connection = db_connection.get_connection()
     try:
@@ -159,6 +166,7 @@ def increment_question_count(username: str) -> int:
 
 
 def reset_question_count(username: str) -> int:
+    """Сбрасывает счетчик вопросов пользователя и возвращает новое значение."""
     _ensure_initialized()
     connection = db_connection.get_connection()
     try:
@@ -184,6 +192,7 @@ def reset_question_count(username: str) -> int:
 
 
 def add_message(message: str) -> None:
+    """Добавляет новое сообщение в таблицу messages."""
     _ensure_initialized()
     connection = db_connection.get_connection()
     try:
@@ -202,6 +211,7 @@ def add_message(message: str) -> None:
 
 
 def get_all_messages() -> List[str]:
+    """Возвращает все сообщения в порядке их создания."""
     _ensure_initialized()
     connection = db_connection.get_connection()
     try:
@@ -220,6 +230,7 @@ def get_all_messages() -> List[str]:
 
 
 def _get_message_row_by_index(index: int):
+    """Возвращает строку сообщения по порядковому индексу в списке."""
     connection = db_connection.get_connection()
     try:
         with connection.cursor() as cursor:
@@ -238,6 +249,7 @@ def _get_message_row_by_index(index: int):
 
 
 def update_message(index: int, new_message: str) -> bool:
+    """Обновляет сообщение по индексу; возвращает успех операции."""
     _ensure_initialized()
     row = _get_message_row_by_index(index)
     if not row:
@@ -269,6 +281,7 @@ def update_message(index: int, new_message: str) -> bool:
 
 
 def delete_message(index: int) -> bool:
+    """Удаляет сообщение по индексу; возвращает успех операции."""
     _ensure_initialized()
     row = _get_message_row_by_index(index)
     if not row:

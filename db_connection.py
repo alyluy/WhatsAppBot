@@ -15,6 +15,7 @@ load_dotenv()
 
 
 def _env_bool(name: str, default: bool = False) -> bool:
+    """Читает boolean-переменную окружения с дефолтным значением."""
     value = os.getenv(name)
     if value is None:
         return default

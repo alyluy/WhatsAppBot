@@ -23,7 +23,9 @@ load_dotenv()
 
 
 class WhatsAppClient:
+    """Клиент для чтения и отправки сообщений через WhatsApp Web."""
     def __init__(self):
+        """Инициализирует настройки клиента из переменных окружения."""
         self.web_url = os.getenv("WA_WEB_URL", "https://web.whatsapp.com/")
         self.chrome_binary = os.getenv("WA_CHROME_BINARY")
         self.chromedriver_path = os.getenv("WA_CHROMEDRIVER_PATH")
@@ -37,12 +39,14 @@ class WhatsAppClient:
 
     @staticmethod
     def _extract_major(version_text: str) -> Optional[str]:
+        """Извлекает major-версию из строки версии."""
         match = re.search(r"(\\d+)\\.", version_text)
         if not match:
             return None
         return match.group(1)
 
     def _read_chrome_major(self) -> Optional[str]:
+        """Возвращает major-версию установленного Chrome."""
         chrome_bin = self.chrome_binary or "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
         if not chrome_bin or not os.path.exists(chrome_bin):
             return None
@@ -53,6 +57,7 @@ class WhatsAppClient:
             return None
 
     def _read_driver_major(self, driver_path: str) -> Optional[str]:
+        """Возвращает major-версию ChromeDriver по пути к бинарнику."""
         if not driver_path or not os.path.exists(driver_path):
             return None
         try:
@@ -62,6 +67,7 @@ class WhatsAppClient:
             return None
 
     def start(self):
+        """Запускает WebDriver с совместимым ChromeDriver."""
         options = webdriver.ChromeOptions()
 
         if self.chrome_binary:
@@ -86,6 +92,7 @@ class WhatsAppClient:
         self.wait = WebDriverWait(self.driver, 25)
 
     def open(self):
+        """Открывает WhatsApp Web и ожидает готовность интерфейса чатов."""
         if not self.driver:
             raise RuntimeError("Driver is not started")
 
@@ -132,15 +139,18 @@ class WhatsAppClient:
             ) from error
 
     def close(self):
+        """Корректно закрывает драйвер и сбрасывает состояние клиента."""
         if self.driver:
             self.driver.quit()
             self.driver = None
             self.wait = None
 
     def get_last_error(self) -> str:
+        """Возвращает текст последней ошибки/предупреждения отправки."""
         return self.last_error
 
     def _open_chat(self, chat_name: str):
+        """Открывает нужный чат по имени через список или поле поиска."""
         if not self.driver or not self.wait:
             raise RuntimeError("Driver is not started")
 
@@ -198,6 +208,7 @@ class WhatsAppClient:
         self._open_chat(chat_name)
 
     def send_message(self, chat_name: str, message: str) -> bool:
+        """Отправляет сообщение в указанный чат."""
         try:
             self.last_error = ""
             self._open_chat(chat_name)
@@ -221,6 +232,7 @@ class WhatsAppClient:
             return False
 
     def _read_last_message(self, direction_class: str) -> Optional[str]:
+        """Читает последний текст сообщения по направлению (in/out)."""
         candidates = []
 
         # Основной путь: контейнеры copyable-text внутри message-in/message-out
@@ -250,6 +262,7 @@ class WhatsAppClient:
 
     @staticmethod
     def _extract_sender_from_pre_plain_text(pre_plain_text: str) -> Optional[str]:
+        """Извлекает имя отправителя из data-pre-plain-text."""
         if not pre_plain_text:
             return None
         # Формат обычно вида: "[12:34, 29.03.2026] Имя: "
@@ -259,6 +272,7 @@ class WhatsAppClient:
         return match.group(1).strip() or None
 
     def _read_last_message_event(self, direction_class: str) -> Optional[Dict[str, str]]:
+        """Читает последнее сообщение как событие sender/text/signature."""
         message_containers = self.driver.find_elements(
             By.XPATH,
             f"//div[contains(@class,'{direction_class}')]//div[contains(@class,'copyable-text')]",
