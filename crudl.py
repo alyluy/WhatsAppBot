@@ -4,7 +4,6 @@
 from constants import *
 import roles
 
-# ===== CREATE =====
 
 def create_message(username, message, db):
     """Создает сообщение."""
@@ -12,11 +11,11 @@ def create_message(username, message, db):
 
     if not roles.has_permission(role, CREATE):
         db.add_log(f"Доступ запрещен: {username} не может создавать сообщения")
-        return
+        return False
 
     db.add_message(f"{username}: {message}")
+    return True
 
-# ===== READ =====
 
 def read_messages(username, db):
     """Возвращает сообщения."""
@@ -28,7 +27,6 @@ def read_messages(username, db):
 
     return db.get_all_messages()
 
-# ===== UPDATE =====
 
 def update_message(username, index, new_message, db):
     """Обновляет сообщение."""
@@ -36,11 +34,10 @@ def update_message(username, index, new_message, db):
 
     if not roles.has_permission(role, UPDATE):
         db.add_log(f"Доступ запрещен: {username} не может изменять сообщения")
-        return
+        return False
 
-    db.update_message(index, f"{username}: {new_message}")
+    return db.update_message(index, f"{username}: {new_message}")
 
-# ===== DELETE =====
 
 def delete_message(username, index, db):
     """Удаляет сообщение."""
@@ -48,11 +45,10 @@ def delete_message(username, index, db):
 
     if not roles.has_permission(role, DELETE):
         db.add_log(f"Доступ запрещен: {username} не может удалять сообщения")
-        return
+        return False
 
-    db.delete_message(index)
+    return db.delete_message(index)
 
-# ===== LIST =====
 
 def list_data(username, db):
     """Возвращает список данных."""
@@ -64,5 +60,5 @@ def list_data(username, db):
 
     return {
         "messages": db.get_all_messages(),
-        "logs": db.get_logs()
+        "logs": db.get_logs(),
     }

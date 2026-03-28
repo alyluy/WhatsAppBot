@@ -1,79 +1,294 @@
-# database.py
-# Модуль эмуляции базы данных
+"""database.py
+SQL-слой для работы с PostgreSQL.
+"""
 
-# ===== Эмуляция SSH =====
+from typing import Dict, List, Optional
 
-VALID_SSH_KEY = "valid_ssh_key"
+import db_connection
 
-def check_ssh_access(ssh_key):
-    """Проверяет корректность SSH-ключа."""
-    return ssh_key == VALID_SSH_KEY
 
-# ===== "База данных" =====
+_initialized = False
 
-messages_db = []
 
-users_db = {
-    "admin": {"role": "Admin", "question_count": 0},
-    "user1": {"role": "User", "question_count": 0},
-    "guest": {"role": "Guest", "question_count": 0}
-}
+def initialize() -> None:
+    """Инициализирует схему БД и стартовые данные."""
+    global _initialized
+    if _initialized:
+        return
+    db_connection.init_schema()
+    _initialized = True
 
-logs_db = []
 
-# ===== Работа с логами =====
+def _ensure_initialized() -> None:
+    if not _initialized:
+        initialize()
 
-def add_log(message):
-    """Добавляет запись в лог системы."""
-    logs_db.append(message)
-    print(f"[LOG]: {message}")
 
-# ===== Работа с пользователями =====
+def add_log(message: str) -> None:
+    _ensure_initialized()
+    connection = db_connection.get_connection()
+    try:
+        with connection.cursor() as cursor:
+            cursor.execute(
+                "INSERT INTO logs (log_message) VALUES (%s)",
+                (message,),
+            )
+        connection.commit()
+        print(f"[LOG]: {message}")
+    except Exception:
+        connection.rollback()
+        raise
+    finally:
+        connection.close()
 
-def get_user(username):
-    """Возвращает пользователя по имени."""
-    return users_db.get(username)
 
-def update_user_role(username, new_role):
-    """Обновляет роль пользователя."""
-    if username in users_db:
-        users_db[username]["role"] = new_role
+def get_logs(limit: int = 200) -> List[str]:
+    _ensure_initialized()
+    connection = db_connection.get_connection()
+    try:
+        with connection.cursor() as cursor:
+            cursor.execute(
+                """
+                SELECT log_message, created_at
+                FROM logs
+                ORDER BY id DESC
+                LIMIT %s
+                """,
+                (limit,),
+            )
+            rows = cursor.fetchall()
+        rows.reverse()
+        return [f"[{created_at}] {message}" for message, created_at in rows]
+    finally:
+        connection.close()
+
+
+def get_user(username: str) -> Optional[Dict[str, object]]:
+    _ensure_initialized()
+    connection = db_connection.get_connection()
+    try:
+        with connection.cursor() as cursor:
+            cursor.execute(
+                """
+                SELECT username, role, question_count
+                FROM users
+                WHERE username = %s
+                """,
+                (username,),
+            )
+            row = cursor.fetchone()
+
+        if not row:
+            return None
+
+        return {
+            "username": row[0],
+            "role": row[1],
+            "question_count": row[2],
+        }
+    finally:
+        connection.close()
+
+
+def ensure_user(username: str, default_role: str = "Guest") -> None:
+    _ensure_initialized()
+    connection = db_connection.get_connection()
+    try:
+        with connection.cursor() as cursor:
+            cursor.execute(
+                """
+                INSERT INTO users (username, role, question_count)
+                VALUES (%s, %s, 0)
+                ON CONFLICT (username) DO NOTHING
+                """,
+                (username, default_role),
+            )
+        connection.commit()
+    except Exception:
+        connection.rollback()
+        raise
+    finally:
+        connection.close()
+
+
+def update_user_role(username: str, new_role: str) -> None:
+    _ensure_initialized()
+    connection = db_connection.get_connection()
+    try:
+        with connection.cursor() as cursor:
+            cursor.execute(
+                """
+                UPDATE users
+                SET role = %s, updated_at = NOW()
+                WHERE username = %s
+                """,
+                (new_role, username),
+            )
+        connection.commit()
         add_log(f"Роль пользователя {username} изменена на {new_role}")
+    except Exception:
+        connection.rollback()
+        raise
+    finally:
+        connection.close()
 
-def increment_question_count(username):
-    """Увеличивает счетчик вопросов."""
-    if username in users_db:
-        users_db[username]["question_count"] += 1
 
-def reset_question_count(username):
-    """Сбрасывает счетчик вопросов."""
-    if username in users_db:
-        users_db[username]["question_count"] = 0
+def increment_question_count(username: str) -> int:
+    _ensure_initialized()
+    connection = db_connection.get_connection()
+    try:
+        with connection.cursor() as cursor:
+            cursor.execute(
+                """
+                UPDATE users
+                SET question_count = question_count + 1,
+                    updated_at = NOW()
+                WHERE username = %s
+                RETURNING question_count
+                """,
+                (username,),
+            )
+            row = cursor.fetchone()
+        connection.commit()
+        return int(row[0]) if row else 0
+    except Exception:
+        connection.rollback()
+        raise
+    finally:
+        connection.close()
 
-# ===== Работа с сообщениями =====
 
-def add_message(message):
-    """Добавляет сообщение в базу."""
-    messages_db.append(message)
-    add_log(f"Сообщение добавлено: {message}")
+def reset_question_count(username: str) -> int:
+    _ensure_initialized()
+    connection = db_connection.get_connection()
+    try:
+        with connection.cursor() as cursor:
+            cursor.execute(
+                """
+                UPDATE users
+                SET question_count = 0,
+                    updated_at = NOW()
+                WHERE username = %s
+                RETURNING question_count
+                """,
+                (username,),
+            )
+            row = cursor.fetchone()
+        connection.commit()
+        return int(row[0]) if row else 0
+    except Exception:
+        connection.rollback()
+        raise
+    finally:
+        connection.close()
 
-def get_all_messages():
-    """Возвращает все сообщения."""
-    return messages_db
 
-def update_message(index, new_message):
-    """Обновляет сообщение по индексу."""
-    if 0 <= index < len(messages_db):
-        old = messages_db[index]
-        messages_db[index] = new_message
-        add_log(f"Сообщение обновлено: {old} -> {new_message}")
+def add_message(message: str) -> None:
+    _ensure_initialized()
+    connection = db_connection.get_connection()
+    try:
+        with connection.cursor() as cursor:
+            cursor.execute(
+                "INSERT INTO messages (message_text) VALUES (%s)",
+                (message,),
+            )
+        connection.commit()
+        add_log(f"Сообщение добавлено: {message}")
+    except Exception:
+        connection.rollback()
+        raise
+    finally:
+        connection.close()
 
-def delete_message(index):
-    """Удаляет сообщение по индексу."""
-    if 0 <= index < len(messages_db):
-        removed = messages_db.pop(index)
-        add_log(f"Сообщение удалено: {removed}")
 
-def get_logs():
-    """Возвращает лог системы."""
-    return logs_db
+def get_all_messages() -> List[str]:
+    _ensure_initialized()
+    connection = db_connection.get_connection()
+    try:
+        with connection.cursor() as cursor:
+            cursor.execute(
+                """
+                SELECT message_text
+                FROM messages
+                ORDER BY id ASC
+                """
+            )
+            rows = cursor.fetchall()
+        return [row[0] for row in rows]
+    finally:
+        connection.close()
+
+
+def _get_message_row_by_index(index: int):
+    connection = db_connection.get_connection()
+    try:
+        with connection.cursor() as cursor:
+            cursor.execute(
+                """
+                SELECT id, message_text
+                FROM messages
+                ORDER BY id ASC
+                LIMIT 1 OFFSET %s
+                """,
+                (index,),
+            )
+            return cursor.fetchone()
+    finally:
+        connection.close()
+
+
+def update_message(index: int, new_message: str) -> bool:
+    _ensure_initialized()
+    row = _get_message_row_by_index(index)
+    if not row:
+        add_log(f"Ошибка обновления: сообщение с index={index} не найдено")
+        return False
+
+    message_id, old_message = row
+
+    connection = db_connection.get_connection()
+    try:
+        with connection.cursor() as cursor:
+            cursor.execute(
+                """
+                UPDATE messages
+                SET message_text = %s,
+                    updated_at = NOW()
+                WHERE id = %s
+                """,
+                (new_message, message_id),
+            )
+        connection.commit()
+        add_log(f"Сообщение обновлено: {old_message} -> {new_message}")
+        return True
+    except Exception:
+        connection.rollback()
+        raise
+    finally:
+        connection.close()
+
+
+def delete_message(index: int) -> bool:
+    _ensure_initialized()
+    row = _get_message_row_by_index(index)
+    if not row:
+        add_log(f"Ошибка удаления: сообщение с index={index} не найдено")
+        return False
+
+    message_id, removed_message = row
+
+    connection = db_connection.get_connection()
+    try:
+        with connection.cursor() as cursor:
+            cursor.execute(
+                "DELETE FROM messages WHERE id = %s",
+                (message_id,),
+            )
+        connection.commit()
+        add_log(f"Сообщение удалено: {removed_message}")
+        return True
+    except Exception:
+        connection.rollback()
+        raise
+    finally:
+        connection.close()
