@@ -36,24 +36,68 @@ def _whatsapp_mode(username: str):
         raise RuntimeError("Для WhatsApp режима укажите WA_DEFAULT_CHAT в .env")
 
     poll_interval = int(os.getenv("WA_POLL_INTERVAL_SEC", "3"))
+    allow_outgoing_test = os.getenv("WA_ALLOW_OUTGOING_TEST", "false").strip().lower() in {"1", "true", "yes", "on"}
+    debug_logs = os.getenv("WA_DEBUG_LOGS", "false").strip().lower() in {"1", "true", "yes", "on"}
     client = WhatsAppClient()
 
-    last_seen = None
+    last_seen_signature = None
     print(f"Запуск WhatsApp режима. Чат: {chat_name}")
+    if allow_outgoing_test:
+        print("Включен тестовый режим: чтение исходящих команд.")
 
     try:
         client.start()
         client.open()
+        client.ensure_chat_open(chat_name)
         print("WhatsApp Web открыт, начинаем цикл чтения/ответа")
 
         while True:
-            incoming = client.read_last_incoming_message(chat_name)
-            if incoming and incoming != last_seen:
-                print(f"Входящее: {incoming}")
-                response = handle_message(username, incoming, db)
+            try:
+                event = client.read_last_incoming_event(chat_name, ensure_open=False)
+                if not event and allow_outgoing_test:
+                    event = client.read_last_outgoing_event(chat_name, ensure_open=False)
+            except Exception as error:
+                print(f"Ошибка чтения чата: {error}")
+                time.sleep(poll_interval)
+                continue
+
+            if debug_logs:
+                print(f"[DEBUG] Последнее событие: {event}")
+
+            if event:
+                incoming = event.get("text", "").strip()
+                sender = (event.get("sender") or username).strip() or username
+                signature = event.get("signature", incoming)
+
+                if not incoming or signature == last_seen_signature:
+                    time.sleep(poll_interval)
+                    continue
+
+                normalized = incoming.lower()
+                is_command = (
+                    normalized.startswith("create ")
+                    or normalized.startswith("read")
+                    or normalized.startswith("update ")
+                    or normalized.startswith("delete ")
+                    or normalized.startswith("list")
+                )
+                if allow_outgoing_test and not is_command:
+                    last_seen_signature = signature
+                    time.sleep(poll_interval)
+                    continue
+
+                print(f"Входящее от {sender}: {incoming}")
+                response = handle_message(sender, incoming, db)
                 sent = client.send_message(chat_name, str(response))
-                print("Ответ отправлен" if sent else "Ошибка отправки ответа")
-                last_seen = incoming
+                if sent:
+                    print("Ответ отправлен")
+                    warning_text = client.get_last_error()
+                    if warning_text:
+                        print(f"Примечание отправки: {warning_text}")
+                else:
+                    error_text = client.get_last_error() or "неизвестная причина"
+                    print(f"Ошибка отправки ответа: {error_text}")
+                last_seen_signature = signature
 
             time.sleep(poll_interval)
     except KeyboardInterrupt:

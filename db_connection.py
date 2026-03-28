@@ -30,6 +30,7 @@ def get_db_config() -> Dict[str, object]:
         "user": os.getenv("DB_USER", "postgres"),
         "password": os.getenv("DB_PASSWORD", "postgres"),
         "connect_timeout": int(os.getenv("DB_CONNECT_TIMEOUT", "5")),
+        "gssencmode": os.getenv("DB_GSSENCMODE", "disable"),
     }
 
 
@@ -54,6 +55,7 @@ def get_connection():
         user=config["user"],
         password=config["password"],
         connect_timeout=config["connect_timeout"],
+        gssencmode=config["gssencmode"],
     )
     connection.autocommit = False
     return connection
